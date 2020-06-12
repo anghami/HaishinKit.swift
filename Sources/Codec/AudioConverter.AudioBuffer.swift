@@ -24,7 +24,7 @@ extension AudioConverter {
         let listSize: Int
 
         private var index = 0
-        private var buffers: [Data]
+        private var buffers: [NSMutableData]
         private var numSamples: Int
         private let bytesPerFrame: Int
         private let maximumBuffers: Int
@@ -47,13 +47,11 @@ extension AudioConverter {
             bufferList = AudioBufferList.allocate(maximumBuffers: maximumBuffers)
             numberChannels = nonInterleaved ? 1 : Int(inSourceFormat.mChannelsPerFrame)
             let dataByteSize = numSamples * bytesPerFrame
-            buffers = .init(repeating: .init(repeating: 0, count: numSamples * bytesPerFrame), count: maximumBuffers)
+            buffers = .init(repeating: NSMutableData(length: numSamples * bytesPerFrame)!, count: maximumBuffers)
             input.unsafeMutablePointer.pointee.mNumberBuffers = UInt32(maximumBuffers)
             for i in 0..<maximumBuffers {
                 input[i].mNumberChannels = UInt32(numberChannels)
-                buffers[i].withUnsafeMutableBytes { pointer in
-                    input[i].mData = pointer.baseAddress
-                }
+                input[i].mData = buffers[i].mutableBytes
                 input[i].mDataByteSize = UInt32(dataByteSize)
             }
         }
@@ -97,10 +95,10 @@ extension AudioConverter {
                 guard let data = bufferList[i].mData else {
                     continue
                 }
-                buffers[i].replaceSubrange(
-                    index * bytesPerFrame..<index * bytesPerFrame + numSamples * bytesPerFrame,
-                    with: data.advanced(by: offset * bytesPerFrame),
-                    count: numSamples * bytesPerFrame
+                buffers[i].replaceBytes(
+                    in: NSMakeRange(index * bytesPerFrame, numSamples * bytesPerFrame),
+                    withBytes: data.advanced(by: offset * bytesPerFrame),
+                    length: numSamples * bytesPerFrame
                 )
             }
             index += numSamples
@@ -110,7 +108,7 @@ extension AudioConverter {
 
         func muted() {
             for i in 0..<maximumBuffers {
-                buffers[i].resetBytes(in: 0...)
+                buffers[i] .resetBytes(in: NSMakeRange(0, buffers[i].length))
             }
         }
 
